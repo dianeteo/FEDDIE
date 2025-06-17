@@ -5,9 +5,9 @@ import dash_mantine_components as dmc
 from dash import Dash, html, callback, Input, State, Output
 from transformers import AutoTokenizer, RobertaForSequenceClassification
 
-tokenizer = AutoTokenizer.from_pretrained("./finetuned_roberta_model")
+tokenizer = AutoTokenizer.from_pretrained("./models/finetuned_roberta_model")
 model = RobertaForSequenceClassification.from_pretrained(
-    "./finetuned_roberta_model", torch_dtype=torch.float16, device_map="cuda")
+    "./models/finetuned_roberta_model", torch_dtype=torch.float16, device_map="cuda")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 id2label = {0: "HAWKISH", 1: "DOVISH", 2: "NEUTRAL"}
