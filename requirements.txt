@@ -1,11 +1,37 @@
-accelerate==1.7.0
-bs4==0.0.2
+# Core DL stack — compatible
+torch==2.2.2+cu121
+torchvision==0.17.2+cu121
+torchaudio==2.2.2+cu121
+
+transformers==4.52.4
+tokenizers>=0.15,<0.19
+
+datasets>=2.19,<3.0
+accelerate>=1.7,<2.0
+
+# ML support
+numpy<2
+pandas>=2.2,<2.4
+matplotlib>=3.8,<4.0
+scikit-learn>=1.4,<1.5
+statsmodels==0.14.1
+
+# Langchain and NLP
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-core==0.3.19
+
+# Web stack
 dash==3.0.4
 dash-mantine-components==2.0.0
-datasets==3.6.0
-matplotlib==3.10.3
-pandas==2.3.0
-scikit-learn==1.7.0
+
+# Other
+bs4==0.0.2
+openai==1.91.0
+packaging>=23.2,<25
+PyPDF2==3.0.1
+protobuf>=6.31,<7.0
 selenium==4.33.0
-torch==2.7.1
-transformers==4.52.4
+sentencepiece>=0.2,<0.3
+typing-extensions==4.13.2
+urllib3==2.4.0

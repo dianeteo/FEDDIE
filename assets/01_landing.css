@@ -1,0 +1,49 @@
+#landing-container {
+    background-color: #FAF2DB;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 50px;
+}
+
+#logo-description-button-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    max-width: 1500px;
+    width: 100%;
+    gap: 20px;
+}
+
+#logo-div {
+    flex: 1;
+    text-align: center;
+}
+
+#logo-img {
+    max-width: 100%;
+    height: auto;
+    max-height: 500px;
+}
+
+#description-button-div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: #062840;
+    margin-right: 50px;
+}
+
+#welcome-title {
+    margin-bottom: 20px;
+}
+
+#description-text {
+    margin-bottom: 30px;
+}
+
+#get-started-button {
+    width: 200px;
+}
