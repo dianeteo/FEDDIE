@@ -33,6 +33,7 @@ def init_db():
             title TEXT,
             url TEXT,
             date TEXT,
+            content TEXT,
             UNIQUE(title)
         )
     """)
@@ -70,24 +71,22 @@ def insert_fomc_document(date, doc_type, source_type, url, content):
     conn.close()
 
 
-def insert_cnbc_article(title, url, date):
+def insert_cnbc_article(title, url, date, content):
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT 1 FROM cnbc_articles WHERE title = ?
-    """, (title,))
-
+    
+    cursor.execute("SELECT 1 FROM cnbc_articles WHERE title = ?", (title,))
+    
     if cursor.fetchone():
         print(f"⚠️ Skipped CNBC article '{title}' (already exists)")
         conn.close()
         return
 
     cursor.execute("""
-        INSERT INTO cnbc_articles (title, url, date)
-        VALUES (?, ?, ?)
-    """, (title, url, date))
-
+        INSERT INTO cnbc_articles (title, url, date, content)
+        VALUES (?, ?, ?, ?)
+    """, (title, url, date, content))
+    
     print(f"✅ Inserted CNBC: {title}")
     conn.commit()
     conn.close()

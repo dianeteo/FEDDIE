@@ -51,9 +51,6 @@ layout = html.Div(
                                 radius="xl",
                             ),
                             href="/dashboard",
-                        ),
-                        dcc.Store(
-                            id='most-recent-fomc-news-store'
                         )
                     ],
                 ),
@@ -70,6 +67,7 @@ layout = html.Div(
 def retrieve_data(n_clicks):
     options = Options()
     options.add_argument('--headless=new')
+    options.add_argument('--log-level=3')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     driver = webdriver.Chrome(options=options)
@@ -187,15 +185,42 @@ def retrieve_data(n_clicks):
         date_tag = card.find("span", class_="Card-time")
         if not title_tag or not date_tag:
             continue
+
         try:
             clean_date = date_tag.text.strip().replace('st', '').replace(
                 'nd', '').replace('rd', '').replace('th', '')
             article_date = datetime.strptime(clean_date, "%a, %b %d %Y")
             if article_date < one_week_ago:
                 continue
-            insert_cnbc_article(title_tag.text.strip(
-            ), title_tag["href"], article_date.strftime("%Y-%m-%d"))
+
+            article_url = title_tag["href"]
+            driver.get(article_url)
+            time.sleep(2)
+
+            article_soup = BeautifulSoup(driver.page_source, 'html.parser')
+            summary = article_soup.find_all('li')
+            paragraphs = article_soup.find_all('p')
+
+            content_parts = [title_tag.text.strip()]
+
+            if summary:
+                content_parts.append("Summary:")
+                content_parts.extend(line.get_text(strip=True) for line in summary if line.get_text(strip=True))
+
+            if paragraphs:
+                content_parts.append("Body:")
+                content_parts.extend(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
+
+            content = '\n'.join(content_parts)
+
+            insert_cnbc_article(
+                title=title_tag.text.strip(),
+                url=article_url,
+                date=article_date.strftime("%Y-%m-%d"),
+                content=content
+            )
+
         except Exception as e:
-            print(f"⚠️ CNBC date parse error: {e}")
+            print(f"⚠️ CNBC article scrape error: {e}")
 
     driver.quit()
