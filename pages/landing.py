@@ -1,0 +1,201 @@
+import dash
+import dash_mantine_components as dmc
+import requests
+import time
+import re
+
+from dash import html, dcc, callback, Input, Output, State
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+from PyPDF2 import PdfReader
+from io import BytesIO
+from datetime import datetime, timedelta
+
+from database.init_db import insert_fomc_document, insert_cnbc_article
+
+dash.register_page(__name__, path="/", name="Landing")
+
+layout = html.Div(
+    id="landing-container",
+    children=[
+        html.Div(
+            id="logo-description-button-container",
+            children=[
+                html.Div(
+                    id="logo-div",
+                    children=html.Img(
+                        id="logo-img",
+                        src="assets/FEDDIE_LOGO.png",
+                    ),
+                ),
+                html.Div(
+                    id="description-button-div",
+                    children=[
+                        dmc.Title("Welcome to FEDDIE",
+                                  id="welcome-title", order=3),
+                        dmc.Text(
+                            "FEDDIE analyses the Federal Market Open Committee's documents and news articles and generates a Hawkish/Dovish sentiment score.",
+                            id="description-text",
+                            size="lg",
+                        ),
+                        dcc.Link(
+                            dmc.Button(
+                                "Get Started",
+                                id="get-started-button",
+                                color="#062840",
+                                variant="filled",
+                                size="lg",
+                                radius="xl",
+                            ),
+                            href="/dashboard",
+                        ),
+                        dcc.Store(
+                            id='most-recent-fomc-news-store'
+                        )
+                    ],
+                ),
+            ],
+        )
+    ]
+)
+
+
+@callback(
+    Input('get-started-button', 'n_clicks'),
+    prevent_initial_call=True
+)
+def retrieve_data(n_clicks):
+    options = Options()
+    options.add_argument('--headless=new')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(options=options)
+
+    today = datetime.today()
+    one_week_ago = today - timedelta(days=7)
+
+    # === FOMC DOCUMENT SCRAPER ===
+    driver.get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
+    time.sleep(2)
+
+    meeting_blocks = driver.find_elements(By.CSS_SELECTOR, ".fomc-meeting")
+    latest_meeting = None
+    latest_date = None
+
+    for block in meeting_blocks:
+        try:
+            month_text = block.find_element(
+                By.CLASS_NAME, "fomc-meeting__month").text.strip()
+            day_text = block.find_element(
+                By.CLASS_NAME, "fomc-meeting__date").text.strip()
+            first_day = int(re.findall(r"\d+", day_text)[0])
+            year_match = re.search(
+                r"20\d{2}", block.get_attribute("innerHTML"))
+            year = int(year_match.group()) if year_match else today.year
+            month_num = time.strptime(month_text, '%B').tm_mon
+            date_obj = datetime(year, month_num, first_day)
+
+            if date_obj <= today and (latest_date is None or date_obj > latest_date):
+                latest_meeting = block
+                latest_date = date_obj
+        except:
+            continue
+
+    if latest_meeting and latest_date:
+        date_str = latest_date.strftime("%Y-%m-%d")
+        full_page_soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        def scrape_and_insert(doc_type, pattern, is_pdf=False, nested_pdf=False):
+            """
+            Args:
+                doc_type (str): 'statement', 'minutes', or 'press_conference'
+                pattern (str): Regex pattern for link discovery
+                is_pdf (bool): Whether the content is a PDF
+                nested_pdf (bool): Whether the PDF link is inside an intermediate page (e.g., press conf)
+            """
+            if nested_pdf:
+                # Step 1: Find the intermediate HTML page (e.g., fomcpresconf20250618.htm)
+                pressconf_link = full_page_soup.find(
+                    "a", href=re.compile(pattern))
+                if not pressconf_link:
+                    print(f"❌ Could not find link to {doc_type} HTML page")
+                    return
+
+                pressconf_url = urljoin(
+                    "https://www.federalreserve.gov", pressconf_link["href"])
+                try:
+                    response = requests.get(pressconf_url)
+                    inner_soup = BeautifulSoup(response.text, "html.parser")
+
+                    # Step 2: Find the actual PDF inside that page
+                    pdf_link = inner_soup.find(
+                        "a", href=re.compile(r"FOMCpresconf20\d{6}\.pdf"))
+                    if not pdf_link:
+                        print(f"❌ No {doc_type} PDF found in linked page")
+                        return
+
+                    pdf_url = urljoin(
+                        "https://www.federalreserve.gov", pdf_link["href"])
+                    response = requests.get(pdf_url)
+                    reader = PdfReader(BytesIO(response.content))
+                    content = "\n".join(page.extract_text()
+                                        or "" for page in reader.pages)
+
+                    insert_fomc_document(
+                        date_str, doc_type, "PDF", pdf_url, content)
+                except Exception as e:
+                    print(f"⚠️ Error while processing nested {doc_type}: {e}")
+                return
+
+            # For direct links (HTML or PDF)
+            link = full_page_soup.find("a", href=re.compile(pattern))
+            if not link:
+                print(f"❌ Could not find direct link for {doc_type}")
+                return
+
+            url = urljoin("https://www.federalreserve.gov", link["href"])
+            try:
+                response = requests.get(url)
+                if is_pdf:
+                    reader = PdfReader(BytesIO(response.content))
+                    content = "\n".join(page.extract_text()
+                                        or "" for page in reader.pages)
+                else:
+                    content = BeautifulSoup(response.text, "html.parser").get_text(
+                        separator="\n", strip=True)
+
+                insert_fomc_document(date_str, doc_type,
+                                     "PDF" if is_pdf else "HTML", url, content)
+            except Exception as e:
+                print(f"⚠️ Error while processing {doc_type}: {e}")
+
+        scrape_and_insert("statement", r"monetary20\d{6}a\.htm")
+        scrape_and_insert("minutes", r"fomcminutes20\d{6}\.htm")
+        scrape_and_insert(
+            "press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
+
+    # === CNBC NEWS SCRAPER ===
+    driver.get("https://www.cnbc.com/federal-reserve/")
+    time.sleep(5)
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+    for card in soup.find_all("div", class_="Card-card"):
+        title_tag = card.find("a", class_="Card-title")
+        date_tag = card.find("span", class_="Card-time")
+        if not title_tag or not date_tag:
+            continue
+        try:
+            clean_date = date_tag.text.strip().replace('st', '').replace(
+                'nd', '').replace('rd', '').replace('th', '')
+            article_date = datetime.strptime(clean_date, "%a, %b %d %Y")
+            if article_date < one_week_ago:
+                continue
+            insert_cnbc_article(title_tag.text.strip(
+            ), title_tag["href"], article_date.strftime("%Y-%m-%d"))
+        except Exception as e:
+            print(f"⚠️ CNBC date parse error: {e}")
+
+    driver.quit()
