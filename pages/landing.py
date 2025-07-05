@@ -1,6 +1,8 @@
 import dash
 import dash_mantine_components as dmc
+import re
 import requests
+import sqlite3
 import time
 import re
 
@@ -14,7 +16,7 @@ from PyPDF2 import PdfReader
 from io import BytesIO
 from datetime import datetime, timedelta
 
-from database.init_db import insert_fomc_document, insert_cnbc_article
+from database.init_db import get_db_connection, insert_fomc_document, insert_cnbc_article
 
 dash.register_page(__name__, path="/", name="Landing")
 
@@ -51,6 +53,9 @@ layout = html.Div(
                                 radius="xl",
                             ),
                             href="/dashboard",
+                        ),
+                        dcc.Store(
+                            id='sentences-store'
                         )
                     ],
                 ),
@@ -60,11 +65,39 @@ layout = html.Div(
 )
 
 
+# === Regex Setup ===
+sentence_pattern = re.compile(r'(?<=[.!?]) +')
+split_tokens = ["but", "however", "even though", "although", "while", ";"]
+split_pattern = re.compile(r"\b(" + "|".join(map(re.escape, split_tokens)) + r")\b|;")
+
+keywords = set(map(str.lower, [
+    "inflation expectation", "interest rate", "bank rate", "fund rate", "price", 
+    "economic activity", "inflation", "employment",
+    "anchor", "cut", "subdue", "decline", "decrease", "reduce", "low", "drop", "fall",
+    "fell", "decelerate", "slow", "pause", "pausing", "stable", "non-accelerating", 
+    "downward", "tighten",
+    "unemployment", "growth", "exchange rate", "productivity", "deficit", "demand",
+    "job market", "monetary policy",
+    "ease", "easing", "rise", "rising", "increase", "expand", "improve", "strong", 
+    "upward", "raise", "high", "rapid"
+]))
+
+junk_phrases = [
+    "cookie", "cookies", "terms of use", "privacy policy", "ads and content", 
+    "by using this site", "subscribe", "sign up", "CNBC", "NBCUniversal", "copyright",
+    "click", "browser", "advertise with us"
+]
+
+
 @callback(
-    Input('get-started-button', 'n_clicks'),
+    Output("sentences-store", "data"),
+    Input("get-started-button", "n_clicks"),
     prevent_initial_call=True
 )
 def retrieve_data(n_clicks):
+    print("🚀 Starting FOMC + CNBC scrape and sentence processing...")
+
+    # === Setup Chrome headless ===
     options = Options()
     options.add_argument('--headless=new')
     options.add_argument('--log-level=3')
@@ -85,13 +118,10 @@ def retrieve_data(n_clicks):
 
     for block in meeting_blocks:
         try:
-            month_text = block.find_element(
-                By.CLASS_NAME, "fomc-meeting__month").text.strip()
-            day_text = block.find_element(
-                By.CLASS_NAME, "fomc-meeting__date").text.strip()
+            month_text = block.find_element(By.CLASS_NAME, "fomc-meeting__month").text.strip()
+            day_text = block.find_element(By.CLASS_NAME, "fomc-meeting__date").text.strip()
             first_day = int(re.findall(r"\d+", day_text)[0])
-            year_match = re.search(
-                r"20\d{2}", block.get_attribute("innerHTML"))
+            year_match = re.search(r"20\d{2}", block.get_attribute("innerHTML"))
             year = int(year_match.group()) if year_match else today.year
             month_num = time.strptime(month_text, '%B').tm_mon
             date_obj = datetime(year, month_num, first_day)
@@ -107,48 +137,30 @@ def retrieve_data(n_clicks):
         full_page_soup = BeautifulSoup(driver.page_source, "html.parser")
 
         def scrape_and_insert(doc_type, pattern, is_pdf=False, nested_pdf=False):
-            """
-            Args:
-                doc_type (str): 'statement', 'minutes', or 'press_conference'
-                pattern (str): Regex pattern for link discovery
-                is_pdf (bool): Whether the content is a PDF
-                nested_pdf (bool): Whether the PDF link is inside an intermediate page (e.g., press conf)
-            """
             if nested_pdf:
-                # Step 1: Find the intermediate HTML page (e.g., fomcpresconf20250618.htm)
-                pressconf_link = full_page_soup.find(
-                    "a", href=re.compile(pattern))
+                pressconf_link = full_page_soup.find("a", href=re.compile(pattern))
                 if not pressconf_link:
                     print(f"❌ Could not find link to {doc_type} HTML page")
                     return
 
-                pressconf_url = urljoin(
-                    "https://www.federalreserve.gov", pressconf_link["href"])
+                pressconf_url = urljoin("https://www.federalreserve.gov", pressconf_link["href"])
                 try:
                     response = requests.get(pressconf_url)
                     inner_soup = BeautifulSoup(response.text, "html.parser")
-
-                    # Step 2: Find the actual PDF inside that page
-                    pdf_link = inner_soup.find(
-                        "a", href=re.compile(r"FOMCpresconf20\d{6}\.pdf"))
+                    pdf_link = inner_soup.find("a", href=re.compile(r"FOMCpresconf20\d{6}\.pdf"))
                     if not pdf_link:
                         print(f"❌ No {doc_type} PDF found in linked page")
                         return
 
-                    pdf_url = urljoin(
-                        "https://www.federalreserve.gov", pdf_link["href"])
+                    pdf_url = urljoin("https://www.federalreserve.gov", pdf_link["href"])
                     response = requests.get(pdf_url)
                     reader = PdfReader(BytesIO(response.content))
-                    content = "\n".join(page.extract_text()
-                                        or "" for page in reader.pages)
-
-                    insert_fomc_document(
-                        date_str, doc_type, "PDF", pdf_url, content)
+                    content = "\n".join(page.extract_text() or "" for page in reader.pages)
+                    insert_fomc_document(date_str, doc_type, "PDF", pdf_url, content)
                 except Exception as e:
                     print(f"⚠️ Error while processing nested {doc_type}: {e}")
                 return
 
-            # For direct links (HTML or PDF)
             link = full_page_soup.find("a", href=re.compile(pattern))
             if not link:
                 print(f"❌ Could not find direct link for {doc_type}")
@@ -159,23 +171,18 @@ def retrieve_data(n_clicks):
                 response = requests.get(url)
                 if is_pdf:
                     reader = PdfReader(BytesIO(response.content))
-                    content = "\n".join(page.extract_text()
-                                        or "" for page in reader.pages)
+                    content = "\n".join(page.extract_text() or "" for page in reader.pages)
                 else:
-                    content = BeautifulSoup(response.text, "html.parser").get_text(
-                        separator="\n", strip=True)
-
-                insert_fomc_document(date_str, doc_type,
-                                     "PDF" if is_pdf else "HTML", url, content)
+                    content = BeautifulSoup(response.text, "html.parser").get_text(separator="\n", strip=True)
+                insert_fomc_document(date_str, doc_type, "PDF" if is_pdf else "HTML", url, content)
             except Exception as e:
                 print(f"⚠️ Error while processing {doc_type}: {e}")
 
         scrape_and_insert("statement", r"monetary20\d{6}a\.htm")
         scrape_and_insert("minutes", r"fomcminutes20\d{6}\.htm")
-        scrape_and_insert(
-            "press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
+        scrape_and_insert("press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
 
-    # === CNBC NEWS SCRAPER ===
+    # === CNBC SCRAPER ===
     driver.get("https://www.cnbc.com/federal-reserve/")
     time.sleep(5)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -187,8 +194,7 @@ def retrieve_data(n_clicks):
             continue
 
         try:
-            clean_date = date_tag.text.strip().replace('st', '').replace(
-                'nd', '').replace('rd', '').replace('th', '')
+            clean_date = date_tag.text.strip().replace('st', '').replace('nd', '').replace('rd', '').replace('th', '')
             article_date = datetime.strptime(clean_date, "%a, %b %d %Y")
             if article_date < one_week_ago:
                 continue
@@ -202,25 +208,74 @@ def retrieve_data(n_clicks):
             paragraphs = article_soup.find_all('p')
 
             content_parts = [title_tag.text.strip()]
-
             if summary:
                 content_parts.append("Summary:")
                 content_parts.extend(line.get_text(strip=True) for line in summary if line.get_text(strip=True))
-
             if paragraphs:
                 content_parts.append("Body:")
                 content_parts.extend(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
 
             content = '\n'.join(content_parts)
-
-            insert_cnbc_article(
-                title=title_tag.text.strip(),
-                url=article_url,
-                date=article_date.strftime("%Y-%m-%d"),
-                content=content
-            )
+            insert_cnbc_article(title=title_tag.text.strip(), url=article_url, date=article_date.strftime("%Y-%m-%d"), content=content)
 
         except Exception as e:
             print(f"⚠️ CNBC article scrape error: {e}")
 
     driver.quit()
+
+    # === PROCESS SENTENCES ===
+    print("⌛ Processing sentences...")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT url, content FROM fomc_documents")
+    fomc_data = [{"url": row[0], "content": row[1], "type": "fomc"} for row in cursor.fetchall()]
+
+    cursor.execute("SELECT url, content FROM cnbc_articles")
+    cnbc_data = [{"url": row[0], "content": row[1], "type": "cnbc"} for row in cursor.fetchall()]
+
+    conn.close()
+
+    all_data = fomc_data + cnbc_data
+    filtered_sentences_by_url = {}
+
+    for item in all_data:
+        content = item.get("content", "")
+        url = item.get("url", "unknown_source")
+        source_type = item.get("type", "unknown_type")
+
+        if not content.strip():
+            continue
+
+        sentences = sentence_pattern.split(content)
+        valid_sentences = []
+
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+
+            parts = split_pattern.split(sentence)
+            parts = [part.strip() for part in parts if part and not re.match(split_pattern, part)]
+
+            for part in parts:
+                if len(part.split()) < 3 or part.count('\n') > 3 or len(re.findall(r'[.!?]', part)) < 1:
+                    continue
+
+                part_lower = part.lower()
+
+                if any(junk_phrase in part_lower for junk_phrase in junk_phrases):
+                    continue
+
+                if any(re.search(rf"\b{re.escape(keyword)}\b", part_lower) for keyword in keywords):
+                    valid_sentences.append(part)
+
+        if valid_sentences:
+            filtered_sentences_by_url[url] = {
+                "type": source_type,
+                "sentences": valid_sentences
+            }
+
+    print(f"✅ Sentence processing complete: {len(filtered_sentences_by_url)} articles with valid content.")
+    
+    return filtered_sentences_by_url
