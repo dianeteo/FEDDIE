@@ -1,4 +1,9 @@
 :root {
+    --FONT-FAMILY: Helvetica;
     --CREAM: #FAF2DB;
     --BLUE: #062840;
+}
+
+body {
+    font-family: var(--FONT-FAMILY);
 }

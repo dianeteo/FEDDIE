@@ -47,3 +47,15 @@
 #get-started-button {
     width: 200px;
 }
+
+#loading-div {
+    padding-top: 5vh;
+}
+
+#loading-progress-bar {
+    margin: auto;
+}
+
+#loading-progress-text {
+    margin-top: 10px;
+}

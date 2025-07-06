@@ -19,9 +19,53 @@ roberta_model_pre_overfit = roberta_model_pre_overfit.to(torch.float32).to(devic
 roberta_model_pre_overfit.eval()
 
 layout = html.Div(
-    id="dashboard-page",
+    id="dashboard-container",
     children=[
-        dmc.Title("Dashboard", order=2),
-        html.Div(id="dashboard-content")
+        html.Div(
+            id="retrieval-statistics-index-summary",
+            style={
+                "display": "flex",
+                "flexDirection": "row",
+                "height": "50vh",     # Top half of the screen
+                "width": "100vw",     # Full screen width
+                "margin": "0",
+                "padding": "0",
+                "gap": "10px"
+            },
+            children=[
+                # LEFT COLUMN: 3 stacked divs
+                html.Div(
+                    style={
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "flex": "1",
+                        "gap": "10px"
+                    },
+                    children=[
+                        html.Div("FOMC Docs", id="num-fomc-documents", style={
+                            "background": "#E5D8C1",
+                            "flex": "1",
+                            "padding": "10px"
+                        }),
+                        html.Div("CNBC Articles", id="num-cnbc-articles", style={
+                            "background": "#D1C0AA",
+                            "flex": "1",
+                            "padding": "10px"
+                        }),
+                        html.Div("Sentences", id="num-sentences", style={
+                            "background": "#BDA893",
+                            "flex": "1",
+                            "padding": "10px"
+                        })
+                    ]
+                ),
+                # RIGHT COLUMN: 1 full-height div
+                html.Div("Index Summary", id="index-summary", style={
+                    "background": "#A9907D",
+                    "flex": "3",
+                    "padding": "10px"
+                })
+            ]
+        )
     ]
 )
