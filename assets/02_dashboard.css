@@ -51,7 +51,8 @@
 }
 
 .fomc-docs-count,
-.cnbc-articles-count {
+.cnbc-articles-count,
+.sentiment-index-value {
     font-size: 6rem;
     font-weight: bold;
     flex: 0 0 auto;
@@ -63,7 +64,8 @@
 }
 
 #fomc-docs-info,
-#cnbc-articles-info {
+#cnbc-articles-info,
+#sentiment-index-info {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -73,7 +75,8 @@
 }
 
 .fomc-docs-title,
-.cnbc-articles-title {
+.cnbc-articles-title,
+.sentiment-index-title {
     color: var(--BLUE);
     font-size: 1.3rem;
     font-weight: bold;
@@ -96,6 +99,24 @@
     /* Custom scrollbar */
     scrollbar-width: thin;
     scrollbar-color: rgba(1, 79, 134, 0.3) rgba(1, 79, 134, 0.1);
+}
+
+.sentiment-index-title-with-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#generate-summary-button {
+    margin-left: 10px;
+}
+
+.sentiment-index-breakdown {
+    padding-left: 3px;
+    padding-right: 8px;
+    padding-bottom: 10px;
+    font-size: 0.8rem;
+    line-height: 1;
 }
 
 /* Webkit scrollbar styling */
@@ -138,7 +159,7 @@
     color: #014F86;
 }
 
-#right-index-summary {
+#index-summary {
     display: flex;
     flex-direction: row;
     align-items: center;

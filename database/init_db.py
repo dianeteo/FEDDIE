@@ -48,6 +48,14 @@ def init_db():
             date TEXT
         )
     """)
+    
+    cursor.execute("""
+        CREATE TABLE summary (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            summary TEXT NOT NULL,
+            generated_timestamp TEXT NOT NULL
+        )
+    """)
 
     conn.commit()
     conn.close()

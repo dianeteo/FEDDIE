@@ -1,4 +1,5 @@
 .venv/
+*.env
 data/
 *.db
 models/
