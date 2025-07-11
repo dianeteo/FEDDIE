@@ -37,6 +37,17 @@ def init_db():
             UNIQUE(title)
         )
     """)
+    
+    cursor.execute("""
+        CREATE TABLE sentences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sentence TEXT NOT NULL UNIQUE,
+            sentiment REAL,
+            source_type TEXT CHECK(source_type IN ('fomc', 'cnbc')),
+            url TEXT,
+            date TEXT
+        )
+    """)
 
     conn.commit()
     conn.close()

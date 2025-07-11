@@ -6,7 +6,7 @@ import sqlite3
 import time
 import re
 
-from dash import html, dcc, ctx, callback, Input, Output, State
+from dash import html, dcc, callback, Input, Output, State
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -52,12 +52,12 @@ layout = html.Div(
                             size="lg",
                             radius="xl",
                         ),
-                        dcc.Store('bool-trigger-scraping'), # STORES BOOLEAN
+                        dcc.Store(id='sentences-store'),
+                        dcc.Store(id='bool-trigger-scraping'), # STORES BOOLEAN
                         dcc.Store(id='fomc-documents-retrieved'), # STORES BOOLEAN 
                         dcc.Store(id='cnbc-articles-retrieved'), # STORES BOOLEAN 
-                        dcc.Store(id='sentences-store'),
-                        dcc.Location(id="redirect", refresh=True),
                         dcc.Store(id="loading-progress-bar-status", data=0),
+                        dcc.Location(id="redirect", refresh=True),
                         html.Div(
                             id='loading-div',
                             children=[
@@ -314,69 +314,71 @@ def scrape_cnbc(trigger, scrape_bool):
     prevent_initial_call=True
 )
 def process_sentences(trigger, scrape_bool):
-    if not trigger or trigger is None or not scrape_bool:
+    if not trigger or not scrape_bool:
         raise dash.exceptions.PreventUpdate
-    
-    # === PROCESS SENTENCES ===
+
     print("⌛ Processing sentences...")
+
+    # === Step 1: Fetch raw content from FOMC & CNBC tables ===
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT url, content FROM fomc_documents")
-    fomc_data = [{"url": row[0], "content": row[1], "type": "fomc"}
-                 for row in cursor.fetchall()]
+    cursor.execute("SELECT url, content, date FROM fomc_documents")
+    fomc_data = [{"url": row[0], "content": row[1], "type": "fomc", "date": row[2]} for row in cursor.fetchall()]
 
-    cursor.execute("SELECT url, content FROM cnbc_articles")
-    cnbc_data = [{"url": row[0], "content": row[1], "type": "cnbc"}
-                 for row in cursor.fetchall()]
+    cursor.execute("SELECT url, content, date FROM cnbc_articles")
+    cnbc_data = [{"url": row[0], "content": row[1], "type": "cnbc", "date": row[2]} for row in cursor.fetchall()]
 
     conn.close()
 
     all_data = fomc_data + cnbc_data
-    filtered_sentences_by_url = {}
+    sentences_to_insert = []
 
     for item in all_data:
         content = item.get("content", "")
         url = item.get("url", "unknown_source")
         source_type = item.get("type", "unknown_type")
+        date = item.get("date", None)
 
         if not content.strip():
             continue
 
         sentences = sentence_pattern.split(content)
-        valid_sentences = []
-
         for sentence in sentences:
             sentence = sentence.strip()
             if not sentence:
                 continue
 
             parts = split_pattern.split(sentence)
-            parts = [part.strip()
-                     for part in parts if part and not re.match(split_pattern, part)]
+            parts = [part.strip() for part in parts if part and not re.match(split_pattern, part)]
 
             for part in parts:
                 if len(part.split()) < 3 or part.count('\n') > 3 or len(re.findall(r'[.!?]', part)) < 1:
                     continue
 
                 part_lower = part.lower()
-
                 if any(junk_phrase in part_lower for junk_phrase in junk_phrases):
                     continue
-
                 if any(re.search(rf"\b{re.escape(keyword)}\b", part_lower) for keyword in keywords):
-                    valid_sentences.append(part)
+                    sentences_to_insert.append((part, None, source_type, url, date))
 
-        if valid_sentences:
-            filtered_sentences_by_url[url] = {
-                "type": source_type,
-                "sentences": valid_sentences
-            }
+    print(f"✅ Prepared {len(sentences_to_insert)} sentences for insertion.")
 
-    print(
-        f"✅ Sentence processing complete: {len(filtered_sentences_by_url)} articles with valid content.")
+    # === Step 2: Insert into the database ===
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    return filtered_sentences_by_url, 100, "Processing sentences...", "/dashboard"
+    cursor.executemany("""
+        INSERT OR IGNORE INTO sentences (sentence, sentiment, source_type, url, date)
+        VALUES (?, ?, ?, ?, ?)
+    """, sentences_to_insert)
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Sentences inserted into the database.")
+
+    return {}, 100, "Processing sentences...", "/dashboard"
 
 
 @callback(
