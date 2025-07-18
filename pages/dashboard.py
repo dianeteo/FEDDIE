@@ -10,6 +10,7 @@ from dash import html, dcc, callback, Input, Output
 from openai import OpenAI
 
 import dash_mantine_components as dmc
+import dash_daq as daq
 
 from transformers import AutoTokenizer, RobertaForSequenceClassification
 
@@ -73,12 +74,40 @@ layout = html.Div(
                 html.Div(
                     id="index-summary",
                     children=[
-                        html.Div(id="sentiment-index-value", className="sentiment-index-value"),  # reuse styling for bold number
+
+                        # SENTIMENT SCORE PANEL (index + slider)
+                        html.Div(
+                            id="sentiment-score-panel",
+                            children=[
+                                html.Div(
+                                    id="sentiment-index-value",
+                                    className="sentiment-index-value",
+                                ),
+                                dmc.Slider(
+                                    id="sentiment-index-slider",
+                                    min=0,
+                                    max=100,
+                                    value=50,
+                                    disabled=True,
+                                    step=1,
+                                    size="lg",
+                                    marks=[
+                                        {"value": 0, "label": "Dovish (-1.0)"},
+                                        {"value": 50, "label": "Neutral (0.0)"},
+                                        {"value": 100, "label": "Hawkish (1.0)"},
+                                    ]
+                                )
+                            ]
+                        ),
+
+                        # SENTIMENT INFO PANEL
                         html.Div(
                             id="sentiment-index-info",
+                            style={"width": "100%"},
                             children=[
                                 html.Div(
                                     className="sentiment-index-title-with-button",
+                                    style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
                                     children=[
                                         html.Div("Sentiment Index & Summary", className="sentiment-index-title"),
                                         dmc.Button(
@@ -90,11 +119,11 @@ layout = html.Div(
                                         )
                                     ],
                                 ),
-                                html.Div(id="sentiment-index-breakdown", className="sentiment-index-breakdown"),
-                                html.Div(id="sentiment-index-summary", className="sentiment-index-breakdown")
+                                html.Div(id="sentiment-index-breakdown", className="sentiment-index-breakdown", style={"marginTop": "0.5rem"}),
+                                html.Div(id="sentiment-index-summary", className="sentiment-breakdown-summary", style={"marginTop": "0.5rem"})
                             ]
                         )
-                    ]
+                    ],
                 )
             ]
         ),
@@ -199,8 +228,9 @@ def load_retrieval_stats(pathname):
 @callback(
     Output("sentiment-index-value", "children"),
     Output("sentiment-index-breakdown", "children"),
-    Input("url", "pathname"),
-    prevent_initial_call=True
+    Output("sentiment-index-slider", "value"),
+    Output("sentiment-index-slider", "styles"),
+    Input("url", "pathname")
 )
 def update_sentiment_index(pathname):
     if pathname != "/dashboard":
@@ -208,20 +238,16 @@ def update_sentiment_index(pathname):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Fetch all labeled sentiments
     cursor.execute("SELECT sentiment FROM sentences WHERE sentiment IS NOT NULL")
     sentiments = [row[0] for row in cursor.fetchall()]
     conn.close()
 
-    # Count sentiment types
     num_hawkish = sum(1 for s in sentiments if s == 0)
     num_dovish = sum(1 for s in sentiments if s == 1)
     num_neutral = sum(1 for s in sentiments if s == 2)
     total = len(sentiments)
 
-    sentiment_index = (num_hawkish - num_dovish) / total if total > 0 else 0
-
+    sentiment_index = (num_hawkish - num_dovish) / total if total > 0 else 0.0
     index_display = f"{sentiment_index:.2f}"
     breakdown = (
         f"Hawkish: {num_hawkish}  |  "
@@ -229,8 +255,37 @@ def update_sentiment_index(pathname):
         f"Neutral: {num_neutral}  |  "
         f"Total: {total}"
     )
+    
+    def get_gradient_stop_color(value):
+        """Returns the interpolated color at a given slider percentage [0-100]"""
+        if value <= 50:
+            ratio = value / 50
+            r, g, b = 255, int(255 * ratio), 0
+        else:
+            ratio = (value - 50) / 50
+            r = int(255 * (1 - ratio))
+            g = int(255 * (1 - 0.5 * ratio))  # yellow to green (255→128)
+            b = 0
+        return f"rgb({r},{g},{b})"
 
-    return index_display, breakdown
+    slider_val = int((sentiment_index + 1) * 50)  # Keep this for color calculation
+    end_color = get_gradient_stop_color(slider_val)
+    
+    gradient = f"linear-gradient(90deg, red 0%, {end_color} 100%)"
+
+    slider_styles = {
+        "bar": {"background": gradient, "height": "8px"},
+        "track": {"background": "#e0e0e0", "height": "8px"},
+        "thumb": {
+            "border": "2px solid white",
+            "boxShadow": "0 0 0 1px rgba(0, 0, 0, 0.1)",
+            "width": "16px",
+            "height": "16px",
+            "backgroundColor": "#fff"
+        }
+    }
+
+    return index_display, breakdown, slider_val, slider_styles
 
 
 @callback(

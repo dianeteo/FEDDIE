@@ -1,6 +1,6 @@
 #dashboard-container {
     background-color: var(--CREAM);
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -10,7 +10,7 @@
 #retrieval-statistics-index-summary {
     display: flex;
     flex-direction: column; /* Changed from row to column */
-    height: 60vh;
+    height: 100%;
     width: 100vw;
     margin: 0;
     padding: 0;
@@ -18,10 +18,11 @@
 }
 
 #top-horizontal-divs {
+    flex: 2;
     display: flex;
     flex-direction: row;
-    flex: 1;
     gap: 10px;
+    max-height: 40%;
 }
 
 #num-fomc-docs {
@@ -51,8 +52,7 @@
 }
 
 .fomc-docs-count,
-.cnbc-articles-count,
-.sentiment-index-value {
+.cnbc-articles-count {
     font-size: 6rem;
     font-weight: bold;
     flex: 0 0 auto;
@@ -61,6 +61,43 @@
     justify-content: center;
     color: var(--BLUE);
     padding-right: 10px;
+}
+
+#index-summary {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 150px; /* Added minimum height for the bottom div */
+    background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
+    padding: 20px;
+    gap: 1rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    width: 100%;
+    max-height: 60%;
+    margin: auto;
+}
+
+.sentiment-score-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 1.5rem;
+}
+
+.sentiment-index-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-align: center;
+}
+
+#sentiment-index-slider {
+    width: 90%;
+    margin: 0 auto 1rem auto;
 }
 
 #fomc-docs-info,
@@ -94,6 +131,19 @@
     padding-left: 3px;
     padding-right: 8px;
     font-size: 0.8rem;
+    line-height: 1;
+
+    /* Custom scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(1, 79, 134, 0.3) rgba(1, 79, 134, 0.1);
+}
+
+.sentiment-breakdown-summary {
+    flex: 1;
+    overflow-y: auto;
+    padding-left: 3px;
+    padding-right: 8px;
+    font-size: 0.9rem;
     line-height: 1;
 
     /* Custom scrollbar */
@@ -157,18 +207,4 @@
 .cnbc-articles-links a:hover {
     text-decoration: underline;
     color: #014F86;
-}
-
-#index-summary {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    flex: 3; /* Changed from flex: 3 to prevent it from taking up too much space */
-    min-height: 150px; /* Added minimum height for the bottom div */
-    background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
-    padding: 20px;
-    gap: 5px;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
 }
