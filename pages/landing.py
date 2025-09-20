@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 from database.init_db import get_db_connection, insert_fomc_document, insert_cnbc_article
 
-dash.register_page(__name__, path="/", name="Home")
+dash.register_page(__name__, path="/", name="Home", order=0)
 
 layout = html.Div(
     id="landing-container",
@@ -132,11 +132,9 @@ def get_started(n_clicks):
 
 
 @callback(
-    Output("bool-trigger-scraping", "data", allow_duplicate=True),
-    Output("fomc-documents-retrieved", "data"),
-    Output("loading-progress-bar-status", "data", allow_duplicate=True),
-    Output("loading-progress-text", "children", allow_duplicate=True),
-    Input("loading-progress-text", "children"),
+    Output("bool-trigger-scraping", "data"),
+    Output("loading-progress-text", "children"),
+    Input("get-started-button", "n_clicks"),
     prevent_initial_call=True
 )
 def scrape_fomc(n_clicks):
@@ -236,7 +234,7 @@ def scrape_fomc(n_clicks):
         
         driver.quit()
         
-        return True, True, 33, "Loading CNBC articles..."
+        return True, "Loading CNBC articles..."
 
 
 @callback(

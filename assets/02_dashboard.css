@@ -1,59 +1,67 @@
 #dashboard-container {
     background-color: var(--CREAM);
-    height: 100vh;
+    height: calc(100vh - 60px);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 50px;
+    padding: 15px;
+    box-sizing: border-box;
 }
 
 #retrieval-statistics-index-summary {
     display: flex;
-    flex-direction: column; /* Changed from row to column */
+    flex-direction: column;
     height: 100%;
-    width: 100vw;
+    width: 100%;
+    max-width: 100vw;
     margin: 0;
-    padding: 0;
+    padding: 10px;
     gap: 10px;
 }
 
 #top-horizontal-divs {
-    flex: 2;
+    flex: 0 0 43%;
     display: flex;
     flex-direction: row;
     gap: 10px;
-    max-height: 40%;
+    min-height: 0;
+    max-height: 43%;
+    overflow: hidden;
 }
 
 #num-fomc-docs {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    flex: 1; /* Takes up 1/3 of the space */
+    flex: 1;
     background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
-    padding: 20px;
+    padding: 12px;
     gap: 5px;
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     overflow: hidden;
+    min-height: 0;
+    max-height: 100%;
 }
 
 #num-cnbc-articles {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    flex: 2.5; /* Takes up 2/3 of the space */
+    flex: 2.5;
     background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
-    padding: 20px;
+    padding: 12px;
     gap: 5px;
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     overflow: hidden;
+    min-height: 0;
+    max-height: 100%;
 }
 
 .fomc-docs-count,
 .cnbc-articles-count {
-    font-size: 6rem;
+    font-size: 4rem;
     font-weight: bold;
     flex: 0 0 auto;
     display: flex;
@@ -64,20 +72,19 @@
 }
 
 #index-summary {
-    flex: 3;
+    flex: 0 0 57%;
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-height: 150px; /* Added minimum height for the bottom div */
+    min-height: 0;
+    max-height: 57%;
     background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
-    padding: 20px;
-    gap: 1rem;
+    padding: 15px;
+    gap: 0.8rem;
     border-radius: 10px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
     overflow: hidden;
     width: 100%;
-    max-height: 60%;
-    margin: auto;
 }
 
 .sentiment-score-panel {
@@ -86,41 +93,42 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    flex-shrink: 0;
 }
 
 #stance-and-score {
-  display: flex;
-  width: 100%;
-  gap: 12px;
-  margin-bottom: 12px;
+    display: flex;
+    width: 100%;
+    gap: 12px;
+    margin-bottom: 8px;
 }
 
 .sentiment-stance-box {
-  color: var(--BLUE);
-  flex: 1 1 0;
-  text-align: center;
-  font-size: 2.5rem;
-  font-weight: bold;
-  border-radius: 8px;
+    color: var(--BLUE);
+    flex: 1 1 0;
+    text-align: center;
+    font-size: 2.5rem;
+    font-weight: bold;
+    border-radius: 8px;
 }
 
 .stance-row {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
 }
 
 .stance-logo {
-  height: 75px;
-  width: auto;
-  display: inline-block;
+    height: 60px;
+    width: auto;
+    display: inline-block;
 }
 
 #sentiment-index-slider {
     width: 90%;
-    margin: 0 auto 1rem auto;
+    margin: 0 auto 0.8rem auto;
 }
 
 #fomc-docs-info,
@@ -154,9 +162,7 @@
     padding-left: 3px;
     padding-right: 8px;
     font-size: 0.8rem;
-    line-height: 1;
-
-    /* Custom scrollbar */
+    line-height: 1.1;
     scrollbar-width: thin;
     scrollbar-color: rgba(1, 79, 134, 0.3) rgba(1, 79, 134, 0.1);
 }
@@ -167,9 +173,7 @@
     padding-left: 3px;
     padding-right: 8px;
     font-size: 0.9rem;
-    line-height: 1;
-
-    /* Custom scrollbar */
+    line-height: 1.2;
     scrollbar-width: thin;
     scrollbar-color: rgba(1, 79, 134, 0.3) rgba(1, 79, 134, 0.1);
 }
@@ -187,12 +191,11 @@
 .sentiment-index-breakdown {
     padding-left: 3px;
     padding-right: 8px;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
     font-size: 0.8rem;
-    line-height: 1;
+    line-height: 1.1;
 }
 
-/* Webkit scrollbar styling */
 .fomc-docs-links::-webkit-scrollbar,
 .cnbc-articles-links::-webkit-scrollbar {
     width: 6px;
