@@ -21,10 +21,12 @@ dash.register_page(__name__, path="/dashboard", name="Dashboard")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # === Load RoBERTa model from local path ===
-model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/finetuned_roberta_model_2_pre_overfit_epoch_10_safetensors"))
+model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/finetuned_roberta_model_macro_f1_minority_recall_4_pre_overfit_epoch_1"))
 
 roberta_tokenizer_pre_overfit = AutoTokenizer.from_pretrained(model_dir)
-roberta_model_pre_overfit = RobertaForSequenceClassification.from_pretrained(model_dir, num_labels=3)
+roberta_model_pre_overfit = RobertaForSequenceClassification.from_pretrained(
+    model_dir, num_labels=3, use_safetensors=False, weights_only=False
+)
 
 roberta_model_pre_overfit = roberta_model_pre_overfit.to(torch.float32).to(device)
 roberta_model_pre_overfit.eval()
@@ -328,72 +330,61 @@ def generate_summary(n_clicks):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # === Fetch all labeled sentences ===
     cursor.execute("SELECT sentence, sentiment FROM sentences WHERE sentiment IS NOT NULL")
     rows = cursor.fetchall()
-
     if not rows:
         conn.close()
         return "No labeled sentences available for summary."
 
-    # === Build sentence lines ===
     label_map = {0: "Hawkish", 1: "Dovish", 2: "Neutral"}
-
-    num_hawkish = 0
-    num_dovish = 0
-    sentence_lines = []
-
-    for i, (sentence, label_id) in enumerate(rows):
-        label = label_map.get(label_id, "Unknown")
-        if label_id == 0:
-            num_hawkish += 1
-        elif label_id == 1:
-            num_dovish += 1
-        sentence_lines.append(f"[{i+1}] \"{sentence}\" → Label: {label}")
-
+    num_hawkish = sum(1 for _,l in rows if l == 0)
+    num_dovish  = sum(1 for _,l in rows if l == 1)
     total = len(rows)
-    index = (num_hawkish - num_dovish) / total if total > 0 else 0
-    sentences_text_block = "\n".join(sentence_lines)
+    index = (num_hawkish - num_dovish) / total if total else 0.0
 
-    # === Compose GPT prompt ===
-    user_message = f"""
-Given the following sentences and their sentiment classifications, summarise the overall monetary policy stance of the Fed.
-
-The index is calculated as: (number of hawkish sentences - number of dovish sentences) / (total number of sentences).
-A positive index (> 0) indicates an overall hawkish stance.
-A negative index (< 0) indicates an overall dovish stance.
-An index close to 0 indicates a neutral stance.
-
-Please consider both the index and the provided sentences in your reasoning.
-
-Index value: {index:.2f}
-
-Sentences:
-{sentences_text_block}
-
-Summary:
-    """
-
-    # === Generate Summary via GPT ===
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a monetary policy expert."},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=500,
-            temperature=0
+    # === Map–Reduce ===
+    BATCH_SIZE = 300
+    batch_summaries = []
+    for i in range(0, total, BATCH_SIZE):
+        subset = rows[i:i+BATCH_SIZE]
+        lines = [f'"{s}" → {label_map.get(l,"Unknown")}' for s,l in subset]
+        batch_prompt = (
+            "You are a monetary policy expert.\n"
+            f"Global Index: {index:.2f}\n\n"
+            "Summarise stance (≤120 words) and give counts hawkish/dovish/neutral.\n"
+            "Sentences:\n" + "\n".join(lines)
         )
-        summary = response.choices[0].message.content
-    except Exception as e:
-        summary = f"❌ Error generating summary: {str(e)}"
-        conn.close()
-        return summary
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role":"user","content": batch_prompt}],
+            max_tokens=250, temperature=0, timeout=30,
+        )
+        batch_summaries.append(r.choices[0].message.content)
 
-    # === Save to DB ===
+    final_prompt = (
+        "You are a monetary policy expert.\n"
+        f"Global Index: {index:.2f}\n\n"
+        "You are given batch summaries (each includes counts). "
+        "Produce ONE final coherent summary (≤200 words).\n\n"
+        + "\n".join(f"[Batch {i+1}] {s}" for i,s in enumerate(batch_summaries))
+    )
+
+    try:
+        final_resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role":"user","content": final_prompt}],
+            max_tokens=400, temperature=0, timeout=45,
+        )
+        summary = final_resp.choices[0].message.content
+    except Exception as e:
+        conn.close()
+        return f"❌ Error generating summary: {e}"
+
     timestamp = datetime.utcnow().isoformat()
-    cursor.execute("INSERT INTO summary (summary, generated_timestamp) VALUES (?, ?)", (summary, timestamp))
+    cursor.execute(
+        "INSERT INTO summary (summary, generated_timestamp) VALUES (?, ?)",
+        (summary, timestamp)
+    )
     conn.commit()
     conn.close()
 
