@@ -6,7 +6,7 @@ import torch
 from datetime import datetime
 from dotenv import load_dotenv
 from tqdm import tqdm
-from dash import html, dcc, callback, Input, Output
+from dash import html, dcc, callback, Input, Output, get_asset_url
 from openai import OpenAI
 
 import dash_mantine_components as dmc
@@ -21,14 +21,16 @@ dash.register_page(__name__, path="/dashboard", name="Dashboard")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # === Load RoBERTa model from local path ===
-model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/finetuned_roberta_model_macro_f1_minority_recall_4_pre_overfit_epoch_1"))
+model_dir = os.path.abspath(os.path.join(os.path.dirname(
+    __file__), "../models/finetuned_roberta_model_macro_f1_minority_recall_4_pre_overfit_epoch_1"))
 
 roberta_tokenizer_pre_overfit = AutoTokenizer.from_pretrained(model_dir)
 roberta_model_pre_overfit = RobertaForSequenceClassification.from_pretrained(
     model_dir, num_labels=3, use_safetensors=False, weights_only=False
 )
 
-roberta_model_pre_overfit = roberta_model_pre_overfit.to(torch.float32).to(device)
+roberta_model_pre_overfit = roberta_model_pre_overfit.to(
+    torch.float32).to(device)
 roberta_model_pre_overfit.eval()
 
 load_dotenv(override=True)
@@ -47,12 +49,15 @@ layout = html.Div(
                         html.Div(
                             id="num-fomc-docs",
                             children=[
-                                html.Div(id="fomc-docs-count", className="fomc-docs-count"),
+                                html.Div(id="fomc-docs-count",
+                                         className="fomc-docs-count"),
                                 html.Div(
                                     id="fomc-docs-info",
                                     children=[
-                                        html.Div("FOMC Documents", className="fomc-docs-title"),
-                                        html.Div(id="fomc-docs-links", className="fomc-docs-links")
+                                        html.Div("FOMC Documents",
+                                                 className="fomc-docs-title"),
+                                        html.Div(id="fomc-docs-links",
+                                                 className="fomc-docs-links")
                                     ]
                                 ),
                             ]
@@ -60,12 +65,15 @@ layout = html.Div(
                         html.Div(
                             id="num-cnbc-articles",
                             children=[
-                                html.Div(id="cnbc-articles-count", className="cnbc-articles-count"),
+                                html.Div(id="cnbc-articles-count",
+                                         className="cnbc-articles-count"),
                                 html.Div(
                                     id="cnbc-articles-info",
                                     children=[
-                                        html.Div("CNBC Articles", className="cnbc-articles-title"),
-                                        html.Div(id="cnbc-articles-links", className="cnbc-articles-links")
+                                        html.Div(
+                                            "CNBC Articles", className="cnbc-articles-title"),
+                                        html.Div(id="cnbc-articles-links",
+                                                 className="cnbc-articles-links")
                                     ]
                                 )
                             ]
@@ -81,10 +89,14 @@ layout = html.Div(
                         html.Div(
                             id="sentiment-score-panel",
                             children=[
-                                html.Div(
-                                    id="sentiment-index-value",
-                                    className="sentiment-index-value",
-                                ),
+                                html.Div(id="stance-and-score",
+                                         children=[
+                                             html.Div(
+                                                 id="sentiment-stance-box",
+                                                 className="sentiment-stance-box"
+                                             ),
+                                         ]
+                                         ),
                                 dmc.Slider(
                                     id="sentiment-index-slider",
                                     min=0,
@@ -95,8 +107,10 @@ layout = html.Div(
                                     size="lg",
                                     marks=[
                                         {"value": 0, "label": "Dovish (-1.0)"},
-                                        {"value": 50, "label": "Neutral (0.0)"},
-                                        {"value": 100, "label": "Hawkish (1.0)"},
+                                        {"value": 50,
+                                            "label": "Neutral (0.0)"},
+                                        {"value": 100,
+                                            "label": "Hawkish (1.0)"},
                                     ]
                                 )
                             ]
@@ -109,9 +123,11 @@ layout = html.Div(
                             children=[
                                 html.Div(
                                     className="sentiment-index-title-with-button",
-                                    style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
+                                    style={
+                                        "display": "flex", "justifyContent": "space-between", "alignItems": "center"},
                                     children=[
-                                        html.Div("Sentiment Index & Summary", className="sentiment-index-title"),
+                                        html.Div("Sentiment Index & Summary",
+                                                 className="sentiment-index-title"),
                                         dmc.Button(
                                             "Generate Summary",
                                             id="generate-summary-button",
@@ -121,8 +137,10 @@ layout = html.Div(
                                         )
                                     ],
                                 ),
-                                html.Div(id="sentiment-index-breakdown", className="sentiment-index-breakdown", style={"marginTop": "0.5rem"}),
-                                html.Div(id="sentiment-index-summary", className="sentiment-breakdown-summary", style={"marginTop": "0.5rem"})
+                                html.Div(id="sentiment-index-breakdown",
+                                         className="sentiment-index-breakdown", style={"marginTop": "0.5rem"}),
+                                html.Div(
+                                    id="sentiment-index-summary", className="sentiment-breakdown-summary", style={"marginTop": "0.5rem"})
                             ]
                         )
                     ],
@@ -150,7 +168,8 @@ def load_retrieval_stats(pathname):
     cursor = conn.cursor()
 
     # === FOMC DOCUMENTS ===
-    cursor.execute("SELECT date, type, url FROM fomc_documents ORDER BY date DESC")
+    cursor.execute(
+        "SELECT date, type, url FROM fomc_documents ORDER BY date DESC")
     fomc_rows = cursor.fetchall()
     fomc_count = len(fomc_rows)
 
@@ -175,10 +194,11 @@ def load_retrieval_stats(pathname):
     cnbc_rows = cursor.fetchall()
     cnbc_count = len(cnbc_rows)
     cnbc_links = [
-        html.A(title, href=url, target="_blank", style={"display": "block", "marginBottom": "4px"})
+        html.A(title, href=url, target="_blank", style={
+               "display": "block", "marginBottom": "4px"})
         for title, url in cnbc_rows
     ]
-    
+
     conn.close()
 
     return fomc_count, fomc_links, cnbc_count, cnbc_links
@@ -194,14 +214,16 @@ def load_retrieval_stats(pathname):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # === GENERATING SENTIMENTS FOR EACH SENTENCE ===
-    cursor.execute("SELECT id, sentence FROM sentences WHERE sentiment IS NULL")
+    cursor.execute(
+        "SELECT id, sentence FROM sentences WHERE sentiment IS NULL")
     sentences_rows = cursor.fetchall()
-    
+
     # === Score each sentence and update DB ===
     for row_id, sentence in tqdm(sentences_rows, desc="Scoring Sentences"):
-        print(f"🔍 Scoring Sentence ID {row_id}: {sentence[:80]}...")  # Show first 80 chars
+        # Show first 80 chars
+        print(f"🔍 Scoring Sentence ID {row_id}: {sentence[:80]}...")
 
         inputs = roberta_tokenizer_pre_overfit(
             sentence,
@@ -217,18 +239,20 @@ def load_retrieval_stats(pathname):
             logits = outputs.logits
             sentiment_score = logits.argmax(dim=-1).item()
 
-        print(f"✅ Predicted Sentiment Score: {sentiment_score}\nLogits: {logits.cpu().numpy()}")
+        print(
+            f"✅ Predicted Sentiment Score: {sentiment_score}\nLogits: {logits.cpu().numpy()}")
 
-        cursor.execute("UPDATE sentences SET sentiment = ? WHERE id = ?", (sentiment_score, row_id))
+        cursor.execute(
+            "UPDATE sentences SET sentiment = ? WHERE id = ?", (sentiment_score, row_id))
 
     conn.commit()
     conn.close()
-    
-    return 
+
+    return
 
 
 @callback(
-    Output("sentiment-index-value", "children"),
+    Output("sentiment-stance-box", "children"),
     Output("sentiment-index-breakdown", "children"),
     Output("sentiment-index-slider", "value"),
     Output("sentiment-index-slider", "styles"),
@@ -240,7 +264,8 @@ def update_sentiment_index(pathname):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT sentiment FROM sentences WHERE sentiment IS NOT NULL")
+    cursor.execute(
+        "SELECT sentiment FROM sentences WHERE sentiment IS NOT NULL")
     sentiments = [row[0] for row in cursor.fetchall()]
     conn.close()
 
@@ -250,14 +275,38 @@ def update_sentiment_index(pathname):
     total = len(sentiments)
 
     sentiment_index = (num_hawkish - num_dovish) / total if total > 0 else 0.0
-    index_display = f"{sentiment_index:.2f}"
+    
+    # Stance and logo selection
+    if sentiment_index > 0:
+        stance_text = f"Hawkish ({sentiment_index:.2f})"
+        logo_file = "HAWKISH_LOGO.png"
+    elif sentiment_index < 0:
+        stance_text = f"Dovish ({sentiment_index:.2f})"
+        logo_file = "DOVISH_LOGO.png"
+    else:
+        stance_text = f"Neutral ({sentiment_index:.2f})"
+        logo_file = "FEDDIE_LOGO.png"
+        
+    stance_children = html.Div(
+        className="stance-row",
+        children=[
+            html.Span(stance_text),
+            html.Img(
+                src=get_asset_url(logo_file),
+                alt=f"{stance_text} logo",
+                className="stance-logo",
+                draggable="false"
+            ),
+        ],
+    )
+    
     breakdown = (
         f"Hawkish: {num_hawkish}  |  "
         f"Dovish: {num_dovish}  |  "
         f"Neutral: {num_neutral}  |  "
         f"Total: {total}"
     )
-    
+
     def get_gradient_stop_color(value):
         """Returns the interpolated color at a given slider percentage [0-100]"""
         if value <= 50:
@@ -270,9 +319,10 @@ def update_sentiment_index(pathname):
             b = 0
         return f"rgb({r},{g},{b})"
 
-    slider_val = int((sentiment_index + 1) * 50)  # Keep this for color calculation
+    # Keep this for color calculation
+    slider_val = int((sentiment_index + 1) * 50)
     end_color = get_gradient_stop_color(slider_val)
-    
+
     gradient = f"linear-gradient(90deg, red 0%, {end_color} 100%)"
 
     slider_styles = {
@@ -287,7 +337,7 @@ def update_sentiment_index(pathname):
         }
     }
 
-    return index_display, breakdown, slider_val, slider_styles
+    return stance_children, breakdown, slider_val, slider_styles
 
 
 @callback(
@@ -316,7 +366,7 @@ def load_latest_summary(pathname):
         return f"🕒 {timestamp[:19]} UTC\n\n{summary}"
     else:
         return "ℹ️ No summary has been generated yet. Click 'Generate Summary' to create one."
-    
+
 
 @callback(
     Output("sentiment-index-summary", "children", allow_duplicate=True),
@@ -330,15 +380,16 @@ def generate_summary(n_clicks):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT sentence, sentiment FROM sentences WHERE sentiment IS NOT NULL")
+    cursor.execute(
+        "SELECT sentence, sentiment FROM sentences WHERE sentiment IS NOT NULL")
     rows = cursor.fetchall()
     if not rows:
         conn.close()
         return "No labeled sentences available for summary."
 
     label_map = {0: "Hawkish", 1: "Dovish", 2: "Neutral"}
-    num_hawkish = sum(1 for _,l in rows if l == 0)
-    num_dovish  = sum(1 for _,l in rows if l == 1)
+    num_hawkish = sum(1 for _, l in rows if l == 0)
+    num_dovish = sum(1 for _, l in rows if l == 1)
     total = len(rows)
     index = (num_hawkish - num_dovish) / total if total else 0.0
 
@@ -347,7 +398,7 @@ def generate_summary(n_clicks):
     batch_summaries = []
     for i in range(0, total, BATCH_SIZE):
         subset = rows[i:i+BATCH_SIZE]
-        lines = [f'"{s}" → {label_map.get(l,"Unknown")}' for s,l in subset]
+        lines = [f'"{s}" → {label_map.get(l,"Unknown")}' for s, l in subset]
         batch_prompt = (
             "You are a monetary policy expert.\n"
             f"Global Index: {index:.2f}\n\n"
@@ -356,7 +407,7 @@ def generate_summary(n_clicks):
         )
         r = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role":"user","content": batch_prompt}],
+            messages=[{"role": "user", "content": batch_prompt}],
             max_tokens=250, temperature=0, timeout=30,
         )
         batch_summaries.append(r.choices[0].message.content)
@@ -366,13 +417,14 @@ def generate_summary(n_clicks):
         f"Global Index: {index:.2f}\n\n"
         "You are given batch summaries (each includes counts). "
         "Produce ONE final coherent summary (≤200 words).\n\n"
-        + "\n".join(f"[Batch {i+1}] {s}" for i,s in enumerate(batch_summaries))
+        + "\n".join(f"[Batch {i+1}] {s}" for i,
+                    s in enumerate(batch_summaries))
     )
 
     try:
         final_resp = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role":"user","content": final_prompt}],
+            messages=[{"role": "user", "content": final_prompt}],
             max_tokens=400, temperature=0, timeout=45,
         )
         summary = final_resp.choices[0].message.content

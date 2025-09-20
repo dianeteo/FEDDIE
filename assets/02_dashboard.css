@@ -89,10 +89,33 @@
     padding-bottom: 1.5rem;
 }
 
-.sentiment-index-value {
-    font-size: 2.5rem;
-    font-weight: bold;
-    text-align: center;
+#stance-and-score {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sentiment-stance-box {
+  color: var(--BLUE);
+  flex: 1 1 0;
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  border-radius: 8px;
+}
+
+.stance-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stance-logo {
+  height: 75px;
+  width: auto;
+  display: inline-block;
 }
 
 #sentiment-index-slider {
