@@ -1,6 +1,13 @@
 # FEDDIE: Macroeconomic Sentiment & Data Dashboard  
 
-![FEDDIE Logo](./assets/feddie_logo.png)  
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4e83f6e9-b3ff-43fb-a278-19b327872248" 
+       alt="FEDDIE_LOGO" 
+       width="500" 
+       height="500">
+</p>
+
+<br>
 
 **FEDDIE** (Federal Reserve Economic Data & Documents Intelligence Engine) is a full-stack system that integrates:  
 
@@ -23,19 +30,49 @@ The project demonstrates how **economic research and ML engineering** can be com
 
 ---
 
-## ⚙️ Technical Architecture  
-
-```mermaid
-flowchart TD
-    A[Data Sources: FRED, FOMC, CNBC] -->|scraping| B[SQLite Database]
-    B -->|ETL| C[Sentence Processor]
-    C --> D[Fine-tuned LLM Classifier]
-    D -->|scores| E[Sentiment Store]
-    E --> F[REST API]
-    F --> G[Dash Frontend]
-    H[Users] --> G```
-
+## ⚙️ Technical Architecture
+                       
 - **Backend:** Python, Dash, Flask API  
-- **Database:** SQLite (local) / PostgreSQL (scalable option)  
+- **Database:** SQLite (local)
 - **Model Training:** PyTorch, Hugging Face Transformers  
-- **Deployment:** Dockerized API + Dash frontend  
+- **Deployment:** Dockerized API + Dash frontend
+  
+---
+
+## 🧠 Model Training  
+
+### Dataset  
+- **FOMC Minutes/Statements** (primary source of Fed communication)  
+- **CNBC News Articles** (proxy for market/media interpretation)  
+- Sentences are labeled **hawkish/dovish/neutral**.  
+
+### Fine-tuning Steps  
+
+1. Preprocess sentences (tokenization, truncation to 512 tokens).  
+2. Split into train/val/test sets.  
+3. Fine-tune transformer with **class-balanced loss** to address imbalance.  
+4. Optimize for **macro-F1** and **minority recall** (important for minority hawkish and dovish class).  
+
+```
+python train.py \
+    --model roberta-large \
+    --train_data data/train.csv \
+    --val_data data/val.csv \
+    --epochs 5 \
+    --batch_size 16 \
+    --lr 2e-5 \
+    --save_dir models/feddie_roberta
+```
+
+### Referenced Methodology  
+Fine-tuning approach adapted from:
+> Shapiro, A. & Wilson, B. (2022). Hawkish or Dovish? Detecting Monetary Policy Stance in Central Bank Communication Using Transformers. Journal of Financial Econometrics.
+
+---
+
+## 📊 Economic Context
+
+Why this matters:
+- Fed communication strongly influences market expectations and asset pricing.
+- Detecting shifts in tone (hawkish vs dovish) provides early insight into monetary policy stance.
+- This project showcases how econometric reasoning (sentiment as a proxy for stance) and ML techniques (transformer fine-tuning) can work together.
