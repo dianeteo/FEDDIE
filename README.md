@@ -33,6 +33,9 @@ flowchart TD
     D -->|scores| E[Sentiment Store]
     E --> F[REST API]
     F --> G[Dash Frontend]
-    H[Users] --> G[End]
+    H[Users] --> G```
 
-- Test
+- **Backend:** Python, Dash, Flask API  
+- **Database:** SQLite (local) / PostgreSQL (scalable option)  
+- **Model Training:** PyTorch, Hugging Face Transformers  
+- **Deployment:** Dockerized API + Dash frontend  
