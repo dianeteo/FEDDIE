@@ -1,6 +1,6 @@
 # FEDDIE: Macroeconomic Sentiment & Data Dashboard  
 
-![FEDDIE Logo](assets/feddie_logo.png)  
+![FEDDIE Logo](./assets/feddie_logo.png)  
 
 **FEDDIE** (Federal Reserve Economic Data & Documents Intelligence Engine) is a full-stack system that integrates:  
 
@@ -33,4 +33,6 @@ flowchart TD
     D -->|scores| E[Sentiment Store]
     E --> F[REST API]
     F --> G[Dash Frontend]
-    H[Users] --> G
+    H[Users] --> G[End]
+
+- Test
