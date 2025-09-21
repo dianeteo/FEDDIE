@@ -60,8 +60,6 @@ app.layout = dmc.MantineProvider(
                         "overflow": "auto",     # scroll inside if content is taller
                         "display": "flex",
                         "flexDirection": "column",
-                        "justifyContent": "center",  # optional, to vertically center
-                        "alignItems": "center",      # optional, to horizontally center
                     },
                 ),
             ],
