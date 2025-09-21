@@ -1,0 +1,109 @@
+#macro-container {
+  background: var(--CREAM);
+  min-height: calc(100vh - 60px);
+  padding: 25px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.macro-hero {
+  display: grid;
+  gap: 12px;
+  align-items: center;
+  grid-template-columns: 1fr auto;
+}
+
+.macro-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* one-row KPI strip */
+#macro-kpis {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin-top: 14px;
+  overflow-x: auto;
+  padding-bottom: 2px; 
+}
+
+@media (max-width: 1400px) {
+  #macro-kpis { grid-template-columns: repeat(3, minmax(170px, 1fr)); }
+}
+@media (max-width: 800px) {
+  #macro-kpis { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+}
+
+
+/* 6 equal columns across the row */
+.kpi-card {
+  background: linear-gradient(135deg, #E5D8C1 0%, #F0E6D2 100%);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  /* 6 cards = each gets 1/6 width minus gaps */
+  flex: 0 0 calc((100% - 5 * 12px) / 6);
+  /* keep a sensible minimum so text doesn’t crush; enables horizontal scroll if needed */
+  min-width: 180px;
+}
+
+.kpi-title {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--BLUE);
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #062840;
+}
+
+.kpi-date {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* row below KPIs */
+#macro-display {
+  margin-top: 14px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  padding: 12px;
+}
+
+.display-controls-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 12px;
+  overflow-x: auto
+}
+
+.display-controls-row > * {
+  flex: 0 0 auto;          /* don’t stretch, size to content */
+}
+
+.display-badges-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* make Plotly fit the aesthetic */
+#disp-graph .main-svg {
+  font-family: var(--FONT-FAMILY, Helvetica), Arial, sans-serif;
+}

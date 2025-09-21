@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 
 from database.init_db import get_db_connection, insert_fomc_document, insert_cnbc_article
 
-dash.register_page(__name__, path="/", name="Home")
+dash.register_page(__name__, path="/", name="Home", order=0)
 
 layout = html.Div(
     id="landing-container",
@@ -132,111 +132,65 @@ def get_started(n_clicks):
 
 
 @callback(
-    Output("bool-trigger-scraping", "data", allow_duplicate=True),
-    Output("fomc-documents-retrieved", "data"),
-    Output("loading-progress-bar-status", "data", allow_duplicate=True),
-    Output("loading-progress-text", "children", allow_duplicate=True),
-    Input("loading-progress-text", "children"),
+    Output("bool-trigger-scraping", "data"),
+    Output("fomc-documents-retrieved", "data"),   # <— NEW
+    Output("loading-progress-text", "children"),
+    Input("get-started-button", "n_clicks"),
     prevent_initial_call=True
 )
 def scrape_fomc(n_clicks):
     print("🚀 Starting FOMC + CNBC scrape and sentence processing...")
 
-    # === Setup Chrome headless ===
-    driver = start_chrome_driver()
+    driver = None
+    try:
+        driver = start_chrome_driver()
 
-    today = datetime.today()
+        today = datetime.today()
+        driver.get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
+        time.sleep(2)
 
-    # === FOMC DOCUMENT SCRAPER ===
-    driver.get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
-    time.sleep(2)
+        meeting_blocks = driver.find_elements(By.CSS_SELECTOR, ".fomc-meeting")
+        latest_meeting = None
+        latest_date = None
 
-    meeting_blocks = driver.find_elements(By.CSS_SELECTOR, ".fomc-meeting")
-    latest_meeting = None
-    latest_date = None
-
-    for block in meeting_blocks:
-        try:
-            month_text = block.find_element(
-                By.CLASS_NAME, "fomc-meeting__month").text.strip()
-            day_text = block.find_element(
-                By.CLASS_NAME, "fomc-meeting__date").text.strip()
-            first_day = int(re.findall(r"\d+", day_text)[0])
-            year_match = re.search(
-                r"20\d{2}", block.get_attribute("innerHTML"))
-            year = int(year_match.group()) if year_match else today.year
-            month_num = time.strptime(month_text, '%B').tm_mon
-            date_obj = datetime(year, month_num, first_day)
-
-            if date_obj <= today and (latest_date is None or date_obj > latest_date):
-                latest_meeting = block
-                latest_date = date_obj
-        except:
-            continue
-
-    if latest_meeting and latest_date:
-        date_str = latest_date.strftime("%Y-%m-%d")
-        full_page_soup = BeautifulSoup(driver.page_source, "html.parser")
-
-        def scrape_and_insert(doc_type, pattern, is_pdf=False, nested_pdf=False):
-            if nested_pdf:
-                pressconf_link = full_page_soup.find(
-                    "a", href=re.compile(pattern))
-                if not pressconf_link:
-                    print(f"❌ Could not find link to {doc_type} HTML page")
-                    return
-
-                pressconf_url = urljoin(
-                    "https://www.federalreserve.gov", pressconf_link["href"])
-                try:
-                    response = requests.get(pressconf_url)
-                    inner_soup = BeautifulSoup(response.text, "html.parser")
-                    pdf_link = inner_soup.find(
-                        "a", href=re.compile(r"FOMCpresconf20\d{6}\.pdf"))
-                    if not pdf_link:
-                        print(f"❌ No {doc_type} PDF found in linked page")
-                        return
-
-                    pdf_url = urljoin(
-                        "https://www.federalreserve.gov", pdf_link["href"])
-                    response = requests.get(pdf_url)
-                    reader = PdfReader(BytesIO(response.content))
-                    content = "\n".join(page.extract_text()
-                                        or "" for page in reader.pages)
-                    insert_fomc_document(
-                        date_str, doc_type, "PDF", pdf_url, content)
-                except Exception as e:
-                    print(f"⚠️ Error while processing nested {doc_type}: {e}")
-                return
-
-            link = full_page_soup.find("a", href=re.compile(pattern))
-            if not link:
-                print(f"❌ Could not find direct link for {doc_type}")
-                return
-
-            url = urljoin("https://www.federalreserve.gov", link["href"])
+        for block in meeting_blocks:
             try:
-                response = requests.get(url)
-                if is_pdf:
-                    reader = PdfReader(BytesIO(response.content))
-                    content = "\n".join(page.extract_text()
-                                        or "" for page in reader.pages)
-                else:
-                    content = BeautifulSoup(response.text, "html.parser").get_text(
-                        separator="\n", strip=True)
-                insert_fomc_document(date_str, doc_type,
-                                     "PDF" if is_pdf else "HTML", url, content)
-            except Exception as e:
-                print(f"⚠️ Error while processing {doc_type}: {e}")
+                month_text = block.find_element(By.CLASS_NAME, "fomc-meeting__month").text.strip()
+                day_text = block.find_element(By.CLASS_NAME, "fomc-meeting__date").text.strip()
+                first_day = int(re.findall(r"\d+", day_text)[0])
+                year_match = re.search(r"20\d{2}", block.get_attribute("innerHTML"))
+                year = int(year_match.group()) if year_match else today.year
+                month_num = time.strptime(month_text, '%B').tm_mon
+                date_obj = datetime(year, month_num, first_day)
+                if date_obj <= today and (latest_date is None or date_obj > latest_date):
+                    latest_meeting = block
+                    latest_date = date_obj
+            except:
+                continue
 
-        scrape_and_insert("statement", r"monetary20\d{6}a\.htm")
-        scrape_and_insert("minutes", r"fomcminutes20\d{6}\.htm")
-        scrape_and_insert(
-            "press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
-        
-        driver.quit()
-        
-        return True, True, 33, "Loading CNBC articles..."
+        if latest_meeting and latest_date:
+            date_str = latest_date.strftime("%Y-%m-%d")
+            full_page_soup = BeautifulSoup(driver.page_source, "html.parser")
+
+            def scrape_and_insert(doc_type, pattern, is_pdf=False, nested_pdf=False):
+                scrape_and_insert("statement", r"monetary20\d{6}a\.htm")
+                scrape_and_insert("minutes", r"fomcminutes20\d{6}\.htm")
+                scrape_and_insert("press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
+        else:
+            print("⚠️ No latest meeting block found; proceeding anyway to signal next stage.")
+
+        fomc_token = {"done": True, "t": time.time()}
+        return True, fomc_token, "Loading CNBC articles..."
+
+    except Exception as e:
+        print(f"❌ FOMC scrape error: {e}")
+        return False, False, f"FOMC scrape failed: {e}"
+    finally:
+        try:
+            if driver:
+                driver.quit()
+        except Exception:
+            pass
 
 
 @callback(

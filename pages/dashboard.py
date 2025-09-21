@@ -16,7 +16,7 @@ from transformers import AutoTokenizer, RobertaForSequenceClassification
 
 from database.init_db import get_db_connection
 
-dash.register_page(__name__, path="/dashboard", name="Dashboard")
+dash.register_page(__name__, path="/dashboard", name="Dashboard", order=1)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
