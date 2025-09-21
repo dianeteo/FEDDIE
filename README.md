@@ -9,9 +9,9 @@
 
 <br>
 
-**FEDDIE** (Federal Reserve Economic Data & Documents Intelligence Engine) is a full-stack system that integrates:  
+**FEDDIE** is a full-stack system that integrates:  
 
-- **Macroeconomic data ingestion & visualization** (FRED, BLS, Yahoo Finance, etc.)  
+- **Macroeconomic data ingestion & visualization** (FRED)  
 - **NLP-based sentiment analysis** on FOMC minutes, statements, and CNBC news articles  
 - **Fine-tuned LLMs** for classification of monetary policy stance (hawkish vs dovish)  
 - **Interactive dashboard** for visual exploration of macroeconomic indicators and sentiment trends  
