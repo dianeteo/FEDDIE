@@ -16,19 +16,27 @@ BASE_LINK_STYLE = {
 }
 
 def build_navbar():
-    return dmc.Paper(
-        withBorder=True,
-        shadow="xs",
-        p="sm",
-        style={"height": "60px", "display": "flex", "alignItems": "center"},
-        children=dmc.Group(
-            gap="lg",
-            children=[
-                dcc.Link("Home", href="/", id="nav-home", style=BASE_LINK_STYLE),
-                dcc.Link("Fed Sentiment Dashboard", href="/dashboard", id="nav-dashboard", style=BASE_LINK_STYLE),
-                dcc.Link("Macroeconomic Dashboard", href="/macroeconomic", id="nav-macro", style=BASE_LINK_STYLE),
-            ],
-        ),
+    return html.Div(
+        id="navbar",
+        children=[
+            # Left side: logo + title
+            html.Div(
+                id="navbar-left",
+                children=[
+                    html.Img(src="/assets/FEDDIE_LOGO.png", id="navbar-logo"),
+                    html.Span("FEDDIE", id="navbar-title"),
+                ],
+            ),
+            # Right side: nav links
+            html.Div(
+                id="navbar-links",
+                children=[
+                    dcc.Link("Home", href="/", id="nav-home", className="nav-link"),
+                    dcc.Link("Fed Sentiment Dashboard", href="/dashboard", id="nav-dashboard", className="nav-link"),
+                    dcc.Link("Macroeconomic Dashboard", href="/macroeconomic", id="nav-macro", className="nav-link"),
+                ],
+            ),
+        ],
     )
 
 app.layout = dmc.MantineProvider(

@@ -7,3 +7,56 @@
 body {
     font-family: var(--FONT-FAMILY);
 }
+
+/* Navbar container */
+#navbar {
+    background-color: var(--CREAM);
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    box-sizing: border-box;
+    font-family: var(--FONT-FAMILY);
+}
+
+/* Left side (logo + title) */
+#navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#navbar-logo {
+    height: 40px;
+    width: auto;
+}
+
+#navbar-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--BLUE);
+}
+
+/* Right side (nav links) */
+#navbar-links {
+    display: flex;
+    gap: 20px;
+}
+
+/* Base link style */
+.nav-link {
+    text-decoration: none;
+    font-weight: 500;
+    color: var(--BLUE);
+    padding: 6px 10px;
+    transition: border-color 0.2s, color 0.2s;
+    border-bottom: 2px solid transparent;
+}
+
+/* Active/hover states */
+.nav-link:hover {
+    color: #014F86;
+    border-bottom: 2px solid var(--BLUE);
+}
