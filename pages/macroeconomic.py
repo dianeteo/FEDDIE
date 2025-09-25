@@ -208,6 +208,7 @@ SERIES_MAP = {
 }
 
 # --- DDL per table (simple: date PK, value REAL) ---
+
 CREATE_SQL = {
     "gdp_quarterly":
         "CREATE TABLE IF NOT EXISTS gdp_quarterly (date TEXT PRIMARY KEY, value REAL)",

@@ -2,25 +2,44 @@
     background-color: var(--CREAM);
     height: calc(100vh - 60px);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 15px;
+    padding: 25px;
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+.sentiment-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+.sentiment-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 #retrieval-statistics-index-summary {
     display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
     flex-direction: column;
     height: 100%;
     width: 100%;
     max-width: 100vw;
     margin: 0;
-    padding: 10px;
     gap: 10px;
+    overflow: hidden;
 }
 
 #top-horizontal-divs {
-    flex: 0 0 43%;
+    flex: 0 0 40%;
     display: flex;
     flex-direction: row;
     gap: 10px;
@@ -72,7 +91,7 @@
 }
 
 #index-summary {
-    flex: 0 0 57%;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     align-items: stretch;

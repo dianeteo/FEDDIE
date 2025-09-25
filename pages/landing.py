@@ -6,6 +6,7 @@ import sqlite3
 import time
 import re
 
+from datetime import date, timedelta
 from dash import html, dcc, callback, Input, Output, State
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -130,10 +131,9 @@ def reset_stores_on_landing(pathname):
 def get_started(n_clicks):
     return "Loading FOMC documents..."
 
-
 @callback(
     Output("bool-trigger-scraping", "data"),
-    Output("fomc-documents-retrieved", "data"),   # <— NEW
+    Output("fomc-documents-retrieved", "data"),
     Output("loading-progress-text", "children"),
     Input("get-started-button", "n_clicks"),
     prevent_initial_call=True
@@ -172,10 +172,61 @@ def scrape_fomc(n_clicks):
             date_str = latest_date.strftime("%Y-%m-%d")
             full_page_soup = BeautifulSoup(driver.page_source, "html.parser")
 
-            def scrape_and_insert(doc_type, pattern, is_pdf=False, nested_pdf=False):
-                scrape_and_insert("statement", r"monetary20\d{6}a\.htm")
-                scrape_and_insert("minutes", r"fomcminutes20\d{6}\.htm")
-                scrape_and_insert("press_conference", r"fomcpresconf20\d{6}\.htm", is_pdf=True, nested_pdf=True)
+            # scrape ONLY this month's FOMC *minutes* 
+            from urllib.parse import urljoin
+
+            # define current month window [start, end)
+            month_start = today.replace(day=1).date()
+            month_end = (month_start.replace(year=month_start.year + 1, month=1, day=1)
+                        if month_start.month == 12
+                        else month_start.replace(month=month_start.month + 1, day=1))
+
+            # find all minutes links on the calendar page
+            minutes_links = []
+            for a in full_page_soup.find_all("a", href=True):
+                href = a["href"]
+                m = re.search(r"fomcminutes(20\d{6})\.htm", href)  # captures YYYYMMDD
+                if not m:
+                    continue
+                ymd = m.group(1)
+                try:
+                    dt = datetime.strptime(ymd, "%Y%m%d").date()
+                except ValueError:
+                    continue
+
+                # keep only links whose date is within this month
+                if not (month_start <= dt < month_end):
+                    continue
+
+                abs_url = href if href.startswith("http") else urljoin("https://www.federalreserve.gov", href)
+                minutes_links.append((abs_url, dt))
+
+            # de-dupe by date (multiple anchors can point to same doc)
+            seen = set()
+            filtered = []
+            for url, dt in minutes_links:
+                if dt in seen:
+                    continue
+                seen.add(dt)
+                filtered.append((url, dt))
+
+            # fetch each minutes page and insert
+            for url, dt in filtered:
+                try:
+                    driver.get(url)
+                    time.sleep(2)
+                    doc_soup = BeautifulSoup(driver.page_source, "html.parser")
+                    content = doc_soup.get_text(separator="\n", strip=True)
+
+                    insert_fomc_document(
+                        url=url,
+                        date=dt.strftime("%Y-%m-%d"),
+                        type="minutes",
+                        content=content
+                    )
+                    print(f"✅ Inserted minutes {dt} -> {url}")
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch/insert {url}: {e}")
         else:
             print("⚠️ No latest meeting block found; proceeding anyway to signal next stage.")
 
@@ -258,6 +309,16 @@ def scrape_cnbc(trigger, scrape_bool):
     return True, 66, "Processing sentences..."
 
 
+def _month_bounds(d: date):
+    month_start = d.replace(day=1)
+    # first day of next month
+    if month_start.month == 12:
+        month_end = month_start.replace(year=month_start.year + 1, month=1, day=1)
+    else:
+        month_end = month_start.replace(month=month_start.month + 1, day=1)
+    return month_start, month_end
+
+
 @callback(
     Output("sentences-store", "data", allow_duplicate=True),
     Output("loading-progress-bar-status", "data", allow_duplicate=True),
@@ -273,15 +334,32 @@ def process_sentences(trigger, scrape_bool):
 
     print("⌛ Processing sentences...")
 
-    # === Step 1: Fetch raw content from FOMC & CNBC tables ===
+    # === Step 1: Fetch raw content (filter to THIS MONTH'S FOMC MINUTES) ===
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT url, content, date FROM fomc_documents")
-    fomc_data = [{"url": row[0], "content": row[1], "type": "fomc", "date": row[2]} for row in cursor.fetchall()]
+    # Compute month window in ISO strings (assumes your 'date' column is ISO 'YYYY-MM-DD')
+    today = date.today()
+    month_start, month_end = _month_bounds(today)
+    ms_str = month_start.isoformat()      # e.g. '2025-09-01'
+    me_str = month_end.isoformat()        # e.g. '2025-10-01'
 
+    # Only minutes, only this month
+    cursor.execute("""
+        SELECT url, content, date
+        FROM fomc_documents
+        WHERE type = 'minutes' AND date >= ? AND date < ?
+        ORDER BY date DESC
+    """, (ms_str, me_str))
+    fomc_data = [{"url": r[0], "content": r[1], "type": "fomc", "date": r[2]} for r in cursor.fetchall()]
+
+    # If you STILL want CNBC context (optional), you can either keep it unrestricted,
+    # or also filter CNBC to this month. To keep it unrestricted, leave as-is:
     cursor.execute("SELECT url, content, date FROM cnbc_articles")
-    cnbc_data = [{"url": row[0], "content": row[1], "type": "cnbc", "date": row[2]} for row in cursor.fetchall()]
+    # If you prefer CNBC only this month, use the filtered version instead:
+    # cursor.execute("SELECT url, content, date FROM cnbc_articles WHERE date >= ? AND date < ?", (ms_str, me_str))
+
+    cnbc_data = [{"url": r[0], "content": r[1], "type": "cnbc", "date": r[2]} for r in cursor.fetchall()]
 
     conn.close()
 
@@ -292,7 +370,7 @@ def process_sentences(trigger, scrape_bool):
         content = item.get("content", "")
         url = item.get("url", "unknown_source")
         source_type = item.get("type", "unknown_type")
-        date = item.get("date", None)
+        dt = item.get("date", None)
 
         if not content.strip():
             continue
@@ -304,34 +382,31 @@ def process_sentences(trigger, scrape_bool):
                 continue
 
             parts = split_pattern.split(sentence)
-            parts = [part.strip() for part in parts if part and not re.match(split_pattern, part)]
+            parts = [p.strip() for p in parts if p and not re.match(split_pattern, p)]
 
             for part in parts:
                 if len(part.split()) < 3 or part.count('\n') > 3 or len(re.findall(r'[.!?]', part)) < 1:
                     continue
 
                 part_lower = part.lower()
-                if any(junk_phrase in part_lower for junk_phrase in junk_phrases):
+                if any(jp in part_lower for jp in junk_phrases):
                     continue
-                if any(re.search(rf"\b{re.escape(keyword)}\b", part_lower) for keyword in keywords):
-                    sentences_to_insert.append((part, None, source_type, url, date))
+                if any(re.search(rf"\b{re.escape(k)}\b", part_lower) for k in keywords):
+                    sentences_to_insert.append((part, None, source_type, url, dt))
 
     print(f"✅ Prepared {len(sentences_to_insert)} sentences for insertion.")
 
-    # === Step 2: Insert into the database ===
+    # === Step 2: Insert ===
     conn = get_db_connection()
     cursor = conn.cursor()
-
     cursor.executemany("""
         INSERT OR IGNORE INTO sentences (sentence, sentiment, source_type, url, date)
         VALUES (?, ?, ?, ?, ?)
     """, sentences_to_insert)
-
     conn.commit()
     conn.close()
 
     print("✅ Sentences inserted into the database.")
-
     return {}, 100, "Processing sentences...", "/dashboard"
 
 

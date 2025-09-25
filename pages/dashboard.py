@@ -3,7 +3,7 @@ import dash
 import sqlite3
 import torch
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 from tqdm import tqdm
 from dash import html, dcc, callback, Input, Output, get_asset_url
@@ -11,6 +11,7 @@ from openai import OpenAI
 
 import dash_mantine_components as dmc
 import dash_daq as daq
+from dash_iconify import DashIconify
 
 from transformers import AutoTokenizer, RobertaForSequenceClassification
 
@@ -22,7 +23,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # === Load RoBERTa model from local path ===
 model_dir = os.path.abspath(os.path.join(os.path.dirname(
-    __file__), "../models/finetuned_roberta_model_macro_f1_minority_recall_4_pre_overfit_epoch_1"))
+    __file__), "../models/finetuned_roberta_model_macro_f1_minority_recall_4_best_val_loss"))
 
 roberta_tokenizer_pre_overfit = AutoTokenizer.from_pretrained(model_dir)
 roberta_model_pre_overfit = RobertaForSequenceClassification.from_pretrained(
@@ -39,6 +40,29 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 layout = html.Div(
     id="dashboard-container",
     children=[
+        html.Div(
+            className="sentiment-hero",
+            children=[
+                dmc.Title("Fed Sentiment Dashboard", order=2),
+                html.Div(
+                    className="sentiment-actions",
+                    children=[
+                        dmc.Button(
+                            "Get latest data",
+                            id="btn-fetch-sentiment",
+                            size="sm",
+                            variant="light",
+                            color="#062840",
+                            leftSection=DashIconify(icon="mdi:download"),
+                        ),
+                        dmc.Badge("UPDATED", id="sentiment-status-badge", color="GREEN", variant="light"),
+                        dmc.LoadingOverlay(
+                            id="sentiment-loader"
+                        )
+                    ],
+                ),
+            ],
+        ),
         html.Div(
             id="retrieval-statistics-index-summary",
             children=[
@@ -167,13 +191,28 @@ def load_retrieval_stats(pathname):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # === FOMC DOCUMENTS ===
+    today = date.today()
+
+    # === define month window ===
+    month_start = today.replace(day=1)
+    if today.month == 12:
+        month_end = date(today.year + 1, 1, 1)
+    else:
+        month_end = date(today.year, today.month + 1, 1)
+
+    # === FOMC DOCUMENTS: only this month ===
     cursor.execute(
-        "SELECT date, type, url FROM fomc_documents ORDER BY date DESC")
+        """
+        SELECT date, type, url 
+        FROM fomc_documents 
+        WHERE date >= ? AND date < ?
+        ORDER BY date DESC
+        """,
+        (month_start.isoformat(), month_end.isoformat())
+    )
     fomc_rows = cursor.fetchall()
     fomc_count = len(fomc_rows)
 
-    # Mapping internal types to display labels
     type_labels = {
         "statement": "Statement",
         "minutes": "Meeting Minutes",
@@ -182,25 +221,35 @@ def load_retrieval_stats(pathname):
 
     fomc_links = [
         html.A(
-            f"{date} {type_labels.get(doc_type, doc_type.title())}",
+            f"{doc_date} {type_labels.get(doc_type, doc_type.title())}",
             href=url,
             target="_blank"
         )
-        for date, doc_type, url in fomc_rows
+        for doc_date, doc_type, url in fomc_rows
     ]
 
-    # === CNBC ARTICLES ===
-    cursor.execute("SELECT title, url FROM cnbc_articles ORDER BY date DESC")
+    # === CNBC ARTICLES: only past 7 days ===
+    one_week_ago = today - timedelta(days=7)
+    cursor.execute(
+        """
+        SELECT title, url, date 
+        FROM cnbc_articles 
+        WHERE date >= ?
+        ORDER BY date DESC
+        """,
+        (one_week_ago.isoformat(),)
+    )
     cnbc_rows = cursor.fetchall()
     cnbc_count = len(cnbc_rows)
     cnbc_links = [
-        html.A(title, href=url, target="_blank", style={
-               "display": "block", "marginBottom": "4px"})
-        for title, url in cnbc_rows
+        html.A(
+            title, href=url, target="_blank",
+            style={"display": "block", "marginBottom": "4px"}
+        )
+        for title, url, _ in cnbc_rows
     ]
 
     conn.close()
-
     return fomc_count, fomc_links, cnbc_count, cnbc_links
 
 
